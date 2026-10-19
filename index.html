@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Dash</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center;background:#17152c;color:white;font-family:monospace}
+.game{width:min(95vw,800px);background:#242044;border:3px solid #a8f06a;border-radius:14px;overflow:hidden}
+header{padding:15px;display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;color:#a8f06a;font-size:25px}
+canvas{width:100%;display:block;background:#242044;touch-action:manipulation}
+.controls{text-align:center;padding:15px}
+button{background:#a8f06a;color:#17152c;border:0;padding:12px 25px;border-radius:8px;font:bold 16px monospace;cursor:pointer}
+#jump{margin-left:8px}
+#message{margin:10px 0;color:#d0cce9}
+</style>
+</head>
+<body>
+<div class="game">
+<header><h1>PIXEL DASH</h1><span>Score: <b id="score">0</b></span></header>
+<canvas id="game" width="800" height="400"></canvas>
+<div class="controls"><button id="start">START GAME</button><button id="jump">JUMP ↑</button><div id="message">Press Start to begin!</div></div>
+</div>
+<script>
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+const scoreText=document.getElementById("score"),startBtn=document.getElementById("start"),jumpBtn=document.getElementById("jump"),message=document.getElementById("message");
+const W=800,H=400,ground=330;
+let player,obstacles,score,speed,frame,running,gameOver,lastTime;
+function reset(){
+player={x:80,y:ground-42,w:30,h:42,vy:0,onGround:true};
+obstacles=[];score=0;speed=5;frame=0;running=true;gameOver=false;lastTime=0;
+scoreText.textContent="0";startBtn.textContent="RESTART";message.textContent="Jump over the red obstacles!";
+}
+function start(){reset()}
+function jump(){if(!running)return;if(player.onGround){player.vy=-13;player.onGround=false}}
+startBtn.addEventListener("click",start);
+jumpBtn.addEventListener("click",jump);
+canvas.addEventListener("pointerdown",jump);
+document.addEventListener("keydown",e=>{if(["Space","ArrowUp","KeyW"].includes(e.code)){e.preventDefault();jump()}});
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h)}
+function drawPlayer(){
+let p=player,x=p.x,y=p.y;
+rect(x+5,y,20,14,"#f4bc92");rect(x+19,y+4,4,4,"#17152c");
+rect(x+3,y+14,25,17,"#a8f06a");rect(x+8,y+18,17,5,"#66b847");
+rect(x+1,y+30,28,7,"#5c78db");
+rect(x+5,y+36,7,6,"#f4bc92");rect(x+19,y+36,7,6,"#f4bc92");
+rect(x+2,y+40,11,3,"#17152c");rect(x+18,y+40,11,3,"#17152c");
+}
+function drawBackground(){
+rect(0,0,W,H,"#242044");
+for(let i=0;i<45;i++){let x=(i*137)%W,y=(i*59)%190;rect(x,y,3,3,"#7772aa")}
+rect(0,240,W,90,"#302951");
+for(let i=0;i<9;i++){let x=i*105-(frame*speed*.25%105);rect(x,265,65,65,"#40355e");rect(x+20,245,40,85,"#40355e")}
+rect(0,ground,W,H-ground,"#292543");rect(0,ground,W,5,"#a8f06a");
+for(let x=-(frame*speed%40);x<W;x+=40)rect(x,ground+20,18,4,"#494263");
+}
+function spawnObstacle(){
+let airborne=Math.random()<.45;
+let h=airborne?18:25+Math.random()*22;
+let y=airborne?ground-95-Math.random()*65:ground-h;
+obstacles.push({x:W+10,y,w:airborne?30:22,h,airborne,passed:false});
+}
+function drawObstacle(o){
+rect(o.x,o.y,o.w,o.h,"#ed4b62");
+rect(o.x+4,o.y+4,o.w-8,Math.max(4,o.h-8),"#b72f54");
+rect(o.x+5,o.y+5,5,4,"#ffd0a1");
+if(!o.airborne){rect(o.x-4,o.y+5,5,7,"#ed4b62");rect(o.x+o.w-1,o.y+5,5,7,"#ed4b62")}
+}
+function endGame(){running=false;gameOver=true;message.textContent="Game over! Your score: "+score;startBtn.textContent="PLAY AGAIN"}
+function update(){
+frame++;speed=5+Math.min(8,Math.floor(score/8));
+if(frame%Math.max(22,65-Math.floor(score/3))===0)spawnObstacle();
+player.vy+=.65;player.y+=player.vy;
+if(player.y>=ground-player.h){player.y=ground-player.h;player.vy=0;player.onGround=true}
+player.x=Math.max(0,Math.min(W-player.w,player.x));
+for(let i=obstacles.length-1;i>=0;i--){
+let o=obstacles[i];o.x-=speed;
+let hit=player.x+player.w-5>o.x+3&&player.x+5<o.x+o.w-3&&player.y+player.h-3>o.y+2&&player.y+3<o.y+o.h;
+if(hit){endGame();break}
+if(!o.passed&&o.x+o.w<player.x){o.passed=true;score++;scoreText.textContent=score}
+if(o.x+o.w<0)obstacles.splice(i,1);
+}
+}
+function render(){
+drawBackground();
+if(player)drawPlayer();
+obstacles.forEach(drawObstacle);
+ctx.fillStyle="#fff";ctx.font="bold 16px monospace";ctx.fillText("SPEED "+(speed/5).toFixed(1)+"x",W-120,30);
+if(!running&&!gameOver){
+ctx.fillStyle="#17152cdd";ctx.fillRect(0,0,W,H);
+ctx.fillStyle="#a8f06a";ctx.textAlign="center";ctx.font="bold 38px monospace";ctx.fillText("PIXEL DASH",W/2,155);
+ctx.fillStyle="white";ctx.font="18px monospace";ctx.fillText("Jump to dodge the obstacles!",W/2,195);ctx.textAlign="left";
+}
+if(gameOver){
+ctx.fillStyle="#17152ce8";ctx.fillRect(0,0,W,H);
+ctx.textAlign="center";ctx.fillStyle="#ed6a78";ctx.font="bold 42px monospace";ctx.fillText("GAME OVER",W/2,175);
+ctx.fillStyle="white";ctx.font="20px monospace";ctx.fillText("Score: "+score,W/2,215);ctx.textAlign="left";
+}
+}
+function loop(t){
+if(!lastTime)lastTime=t;
+let delta=Math.min((t-lastTime)/16.67,2);lastTime=t;
+if(running){for(let i=0;i<delta;i++)update()}
+render();requestAnimationFrame(loop);
+}
+player={x:80,y:ground-42,w:30,h:42,vy:0,onGround:true};
+obstacles=[];score=0;speed=5;frame=0;running=false;gameOver=false;
+render();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
